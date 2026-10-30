@@ -30,21 +30,24 @@ jobs:
       - name: Install Dependencies
         run: npm ci --ignore-scripts
 
-      - name: Run Snyk Security Test
-        uses: snyk/actions/node@master
+      - name: Install Snyk CLI
+        run: npm install --global snyk@1.1308.3
+
+      - name: Run Snyk Test and Monitor
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high
+        shell: bash
+        run: |
+          set +e
 
-      - name: Install Dependencies for Monitoring
-        if: always() && github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-        run: npm ci --ignore-scripts
+          snyk test --severity-threshold=high
+          test_exit=$?
 
-      - name: Monitor Project on Snyk
-        if: always() && github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-        uses: snyk/actions/node@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: monitor
+          snyk monitor
+          monitor_exit=$?
+
+          if [ "$test_exit" -ne 0 ]; then
+            exit "$test_exit"
+          fi
+
+          exit "$monitor_exit"
